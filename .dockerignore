@@ -1,0 +1,15 @@
+venv
+env
+.env
+.git
+__pycache__
+*.pyc
+*.pyo
+*.db
+uploads/*
+face_encodings/*
+*.log
+.idea
+.vscode
+Dockerfile
+.dockerignore
