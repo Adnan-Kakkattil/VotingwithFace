@@ -22,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY . .
 
-# Create directories for db, uploads, face encodings
-RUN mkdir -p uploads face_encodings data
+# Create directories for db, uploads, face encodings (ensure writable)
+RUN mkdir -p uploads face_encodings data && chmod -R 777 uploads face_encodings data
 
 # Expose port
 EXPOSE 5000

@@ -146,9 +146,19 @@
             const r = await fetch('{{ url_for("vote_api.cast_vote") }}', {
                 method: 'POST',
                 body: formData,
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
-            const data = await r.json();
+            let data;
+            try {
+                data = await r.json();
+            } catch (parseErr) {
+                const text = await r.text();
+                voteStatus.className = 'alert alert-danger';
+                voteStatus.textContent = 'Server error. ' + (r.status ? 'Status: ' + r.status : '') + (text ? ' ' + text.slice(0, 80) : '');
+                submitVoteBtn.disabled = false;
+                return;
+            }
             if (data.success) {
                 voteStatus.className = 'alert alert-success';
                 voteStatus.textContent = 'Vote cast successfully! Redirecting...';
@@ -160,7 +170,7 @@
             }
         } catch (e) {
             voteStatus.className = 'alert alert-danger';
-            voteStatus.textContent = 'Network error. Try again.';
+            voteStatus.textContent = e.message || 'Network error. Try again.';
             submitVoteBtn.disabled = false;
         }
     });

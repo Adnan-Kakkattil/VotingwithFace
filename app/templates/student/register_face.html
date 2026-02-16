@@ -57,7 +57,7 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
-        capturedData = canvas.toDataURL('image/jpeg');
+        capturedData = canvas.toDataURL('image/jpeg', 0.95);
         previewImg.src = capturedData;
         preview.classList.remove('d-none');
     }
@@ -70,16 +70,23 @@
         }
         captureBtn.disabled = true;
         status.className = 'alert alert-info';
-        status.textContent = 'Registering...';
+        status.textContent = 'Registering... (this may take 10–30 seconds)';
         try {
             const formData = new FormData();
             formData.append('image', capturedData);
             const r = await fetch('{{ url_for("face_api.register_face") }}', {
                 method: 'POST',
                 body: formData,
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
-            const data = await r.json();
+            let data;
+            try {
+                data = await r.json();
+            } catch (parseErr) {
+                const text = await r.text();
+                throw new Error('Server error: ' + (r.status || '') + ' ' + (text.slice(0, 100) || 'Invalid response'));
+            }
             if (data.success) {
                 status.className = 'alert alert-success';
                 status.textContent = 'Face registered successfully! Redirecting...';
@@ -91,7 +98,7 @@
             }
         } catch (e) {
             status.className = 'alert alert-danger';
-            status.textContent = 'Network error. Try again.';
+            status.textContent = e.message || 'Network error. Try again.';
             captureBtn.disabled = false;
         }
     }

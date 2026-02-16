@@ -16,10 +16,7 @@ def get_face_service():
     from app.services.face_recognition_service import FaceRecognitionService
     return FaceRecognitionService(
         current_app.config['FACE_ENCODINGS_FOLDER'],
-        tolerance=getattr(
-            current_app.config.get('FACE_ENCODING_TOLERANCE', 0.5),
-            0.5
-        )
+        tolerance=current_app.config.get('FACE_ENCODING_TOLERANCE', 0.5)
     )
 
 
@@ -47,30 +44,33 @@ def register_face():
     Register user's face. Expects multipart form with 'image' (file or base64).
     Students only.
     """
-    if not current_user.is_student():
-        return jsonify({'success': False, 'error': 'Students only'}), 403
-    
-    img = decode_image_from_request()
-    if img is None:
-        return jsonify({'success': False, 'error': 'No image provided'}), 400
-    
-    service = get_face_service()
-    if not service.detect_face_in_image(img):
-        return jsonify({
-            'success': False,
-            'error': 'Ensure exactly one face is visible in the frame'
-        }), 400
-    
-    encoding = service.encode_face_from_image(img)
-    if encoding is None:
-        return jsonify({'success': False, 'error': 'Could not extract face encoding'}), 400
-    
-    path = service.save_encoding(current_user.id, encoding)
-    current_user.face_encoding_path = path
-    from app import db
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Face registered successfully'})
+    try:
+        if not current_user.is_student():
+            return jsonify({'success': False, 'error': 'Students only'}), 403
+
+        img = decode_image_from_request()
+        if img is None:
+            return jsonify({'success': False, 'error': 'No image provided'}), 400
+
+        service = get_face_service()
+        ok, msg = service.detect_face_in_image(img)
+        if not ok:
+            return jsonify({'success': False, 'error': msg}), 400
+
+        encoding = service.encode_face_from_image(img)
+        if encoding is None:
+            return jsonify({'success': False, 'error': 'Could not extract face encoding'}), 400
+
+        path = service.save_encoding(current_user.id, encoding)
+        current_user.face_encoding_path = path
+        from app import db
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Face registered successfully'})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @face_api_bp.route('/verify', methods=['POST'])
@@ -80,24 +80,29 @@ def verify_face():
     Verify user's face against stored encoding.
     Returns success if face matches.
     """
-    if not current_user.is_student():
-        return jsonify({'success': False, 'error': 'Students only'}), 403
-    
-    if not current_user.face_encoding_path:
-        return jsonify({'success': False, 'error': 'No face registered'}), 400
-    
-    img = decode_image_from_request()
-    if img is None:
-        return jsonify({'success': False, 'error': 'No image provided'}), 400
-    
-    service = get_face_service()
-    encoding = service.encode_face_from_image(img)
-    if encoding is None:
-        return jsonify({'success': False, 'error': 'Could not detect face'}), 400
-    
-    match, distance = service.verify_face(encoding, current_user.face_encoding_path)
-    return jsonify({
-        'success': match,
-        'verified': match,
-        'distance': distance
-    })
+    try:
+        if not current_user.is_student():
+            return jsonify({'success': False, 'error': 'Students only'}), 403
+
+        if not current_user.face_encoding_path:
+            return jsonify({'success': False, 'error': 'No face registered'}), 400
+
+        img = decode_image_from_request()
+        if img is None:
+            return jsonify({'success': False, 'error': 'No image provided'}), 400
+
+        service = get_face_service()
+        encoding = service.encode_face_from_image(img)
+        if encoding is None:
+            return jsonify({'success': False, 'error': 'Could not detect face'}), 400
+
+        match, distance = service.verify_face(encoding, current_user.face_encoding_path)
+        return jsonify({
+            'success': match,
+            'verified': match,
+            'distance': distance
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500

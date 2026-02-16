@@ -26,6 +26,21 @@ class FaceRecognitionService:
         """Get file path for user's face encoding"""
         return os.path.join(self.encodings_folder, f"user_{user_id}.pkl")
     
+    def _prepare_image(self, image_array):
+        """Resize image if too large/small for better face detection. Returns RGB array."""
+        rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
+        h, w = rgb.shape[:2]
+        # face_recognition works best with faces 100-500px
+        max_dim, min_dim = 800, 250
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+        elif min(h, w) < min_dim:
+            scale = min_dim / min(h, w)
+        else:
+            return rgb
+        new_w, new_h = int(w * scale), int(h * scale)
+        return cv2.resize(rgb, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
     def encode_face_from_image(self, image_array):
         """
         Extract face encoding from image (numpy array, BGR from OpenCV)
@@ -34,9 +49,11 @@ class FaceRecognitionService:
         if not FACE_RECOGNITION_AVAILABLE:
             return None
         try:
-            # face_recognition expects RGB
-            rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
-            encodings = face_recognition.face_encodings(rgb)
+            rgb = self._prepare_image(image_array)
+            encodings = face_recognition.face_encodings(
+                rgb, num_jitters=2,
+                model="small"  # "small" is faster, "large" more accurate
+            )
             if len(encodings) == 1:
                 return encodings[0].tolist()
             return None
@@ -98,15 +115,23 @@ class FaceRecognitionService:
             return False, None
     
     def detect_face_in_image(self, image_array):
-        """Check if exactly one face is present in image"""
+        """Check if exactly one face is present in image. Returns (ok, count_or_error_msg)."""
         if not FACE_RECOGNITION_AVAILABLE:
-            return False
+            return False, "Face recognition not available"
         try:
-            rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
-            face_locations = face_recognition.face_locations(rgb)
-            return len(face_locations) == 1
-        except Exception:
-            return False
+            rgb = self._prepare_image(image_array)
+            # Higher upsampling helps detect faces (especially smaller/distant ones)
+            face_locations = face_recognition.face_locations(
+                rgb, number_of_times_to_upsample=2, model="hog"
+            )
+            n = len(face_locations)
+            if n == 1:
+                return True, 1
+            if n == 0:
+                return False, "No face detected. Try moving closer, ensure good lighting, and face the camera directly."
+            return False, "Multiple faces detected. Ensure only you are in the frame."
+        except Exception as e:
+            return False, str(e)
     
     def delete_encoding(self, user_id):
         """Remove stored face encoding for user"""
