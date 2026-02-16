@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  voting:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=change-this-in-production
+    volumes:
+      - voting_db:/app/instance
+      - voting_uploads:/app/uploads
+      - voting_faces:/app/face_encodings
+
+volumes:
+  voting_db:
+  voting_uploads:
+  voting_faces:
