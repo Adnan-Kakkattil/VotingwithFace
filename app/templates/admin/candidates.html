@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Candidates - Admin{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-person-badge me-2"></i>Candidates</h2>
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Election</th>
+                    <th>Status</th>
+                    <th>Votes</th>
+                    <th>Nominated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in candidates %}
+                <tr>
+                    <td>{{ c.user.name }}</td>
+                    <td>{{ c.election.title }}</td>
+                    <td>
+                        <span class="badge bg-{{ 'success' if c.status=='approved' else 'warning' if c.status=='pending' else 'secondary' }}">
+                            {{ c.status }}
+                        </span>
+                    </td>
+                    <td>{{ c.vote_count }}</td>
+                    <td>{{ c.nominated_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        {% if c.status == 'pending' %}
+                        <form action="{{ url_for('admin.approve_candidate', cid=c.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                        </form>
+                        <form action="{{ url_for('admin.reject_candidate', cid=c.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Reject</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not candidates %}
+        <p class="text-muted mb-0">No candidates yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Student Dashboard{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-person-check me-2"></i>Student Dashboard</h2>
+<div class="card mb-4">
+    <div class="card-body">
+        <p class="mb-2">Welcome, {{ current_user.name }}.</p>
+        {% if not current_user.has_face_registered() %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>Register your face to vote in elections.
+                <a href="{{ url_for('student.register_face_page') }}" class="alert-link ms-2">Register now →</a>
+            </div>
+        {% else %}
+            <p class="text-success mb-0">
+            <i class="bi bi-check-circle me-2"></i>Face registered. You can vote in active elections.
+            {% if current_user.candidacies.count() %}
+            <a href="{{ url_for('candidate.dashboard') }}" class="ms-2">View my candidacies →</a>
+            {% endif %}
+        </p>
+        {% endif %}
+    </div>
+</div>
+<h5 class="mb-3">Ongoing Elections (Vote Now)</h5>
+{% if elections %}
+<div class="row g-3 mb-4">
+    {% for e in elections %}
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ e.title }}</h5>
+                <p class="card-text text-muted small">{{ e.description[:80] if e.description else 'No description' }}{% if e.description and e.description|length > 80 %}...{% endif %}</p>
+                <a href="{{ url_for('student.election_view', eid=e.id) }}" class="btn btn-primary">View & Vote</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted mb-4">No ongoing elections at the moment.</p>
+{% endif %}
+<h5 class="mb-3">Upcoming Elections</h5>
+{% if upcoming %}
+<div class="row g-3">
+    {% for e in upcoming %}
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ e.title }}</h5>
+                <p class="card-text text-muted small">Starts {{ e.start_date.strftime('%b %d, %Y') }}</p>
+                <a href="{{ url_for('student.election_view', eid=e.id) }}" class="btn btn-outline-primary">View & Nominate</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">No upcoming elections.</p>
+{% endif %}
+{% endblock %}

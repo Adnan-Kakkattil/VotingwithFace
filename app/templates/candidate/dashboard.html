@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Candidate Dashboard{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-person-badge me-2"></i>Candidate Dashboard</h2>
+<p class="text-muted mb-4">Your nominations and election statistics.</p>
+{% if candidacies %}
+<div class="row g-3">
+    {% for c in candidacies %}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ c.election.title }}</h5>
+                <p class="mb-2">
+                    <span class="badge bg-{{ 'success' if c.status=='approved' else 'warning' if c.status=='pending' else 'secondary' }}">
+                        {{ c.status }}
+                    </span>
+                </p>
+                <p class="mb-2"><strong>Votes:</strong> {{ c.vote_count }}</p>
+                <p class="text-muted small mb-0">Nominated {{ c.nominated_at.strftime('%b %d, %Y') }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">You have no nominations yet. Nominate yourself from the Student dashboard when elections are open.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Register Face - College Voting{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-camera-video me-2"></i>Register Your Face</h2>
+<div class="card">
+    <div class="card-body">
+        <p class="text-muted">Position your face in the center of the frame. Ensure good lighting and only one person is visible.</p>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="border rounded overflow-hidden bg-dark" style="aspect-ratio:4/3;">
+                    <video id="video" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+                    <canvas id="canvas" class="d-none"></canvas>
+                </div>
+                <div class="mt-2 d-flex gap-2">
+                    <button id="captureBtn" class="btn btn-primary">
+                        <i class="bi bi-camera me-1"></i>Capture & Register
+                    </button>
+                    <a href="{{ url_for('student.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div id="status" class="alert alert-info">Click "Capture & Register" to register your face.</div>
+                <div id="preview" class="d-none">
+                    <img id="previewImg" src="" alt="Captured" class="img-fluid rounded">
+                    <p class="small text-muted mt-2">Review and submit, or capture again.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const captureBtn = document.getElementById('captureBtn');
+    const status = document.getElementById('status');
+    const preview = document.getElementById('preview');
+    const previewImg = document.getElementById('previewImg');
+
+    let stream = null;
+    let capturedData = null;
+
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            video.srcObject = stream;
+        } catch (err) {
+            status.className = 'alert alert-danger';
+            status.textContent = 'Camera access denied. Please allow camera access.';
+        }
+    }
+
+    function capture() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        capturedData = canvas.toDataURL('image/jpeg');
+        previewImg.src = capturedData;
+        preview.classList.remove('d-none');
+    }
+
+    async function register() {
+        if (!capturedData) {
+            status.className = 'alert alert-warning';
+            status.textContent = 'Please capture an image first.';
+            return;
+        }
+        captureBtn.disabled = true;
+        status.className = 'alert alert-info';
+        status.textContent = 'Registering...';
+        try {
+            const formData = new FormData();
+            formData.append('image', capturedData);
+            const r = await fetch('{{ url_for("face_api.register_face") }}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await r.json();
+            if (data.success) {
+                status.className = 'alert alert-success';
+                status.textContent = 'Face registered successfully! Redirecting...';
+                setTimeout(() => window.location.href = '{{ url_for("student.dashboard") }}', 1500);
+            } else {
+                status.className = 'alert alert-danger';
+                status.textContent = data.error || 'Registration failed.';
+                captureBtn.disabled = false;
+            }
+        } catch (e) {
+            status.className = 'alert alert-danger';
+            status.textContent = 'Network error. Try again.';
+            captureBtn.disabled = false;
+        }
+    }
+
+    captureBtn.addEventListener('click', async () => {
+        if (capturedData) {
+            await register();
+        } else {
+            capture();
+            status.textContent = 'Image captured. Click "Capture & Register" again to submit.';
+        }
+    });
+
+    startCamera();
+    window.addEventListener('beforeunload', () => stream && stream.getTracks().forEach(t => t.stop()));
+})();
+</script>
+{% endblock %}

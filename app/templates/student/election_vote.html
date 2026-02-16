@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Vote - {{ election.title }}{% endblock %}
+{% block content %}
+<nav class="mb-3">
+    <a href="{{ url_for('student.dashboard') }}" class="text-muted">← Dashboard</a>
+</nav>
+<h2 class="mb-2">{{ election.title }}</h2>
+<p class="text-muted mb-4">{{ election.description or '' }}</p>
+
+{% if my_nomination %}
+<div class="alert alert-info mb-4">
+    <i class="bi bi-person-badge me-2"></i>Your nomination status: <strong>{{ my_nomination.status }}</strong>
+    {% if my_nomination.status == 'approved' and election.is_ongoing %}
+        – You are a candidate in this election.
+    {% endif %}
+</div>
+{% endif %}
+{% if already_voted %}
+<div class="alert alert-success">
+    <i class="bi bi-check-circle me-2"></i>You have already voted in this election. Thank you!
+</div>
+{% elif election.is_upcoming and not my_nomination %}
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Nominate Yourself</h5>
+        <p class="text-muted">This election has not started yet. You can nominate yourself as a candidate.</p>
+        <form method="POST" action="{{ url_for('student.nominate', eid=election.id) }}">
+            <div class="mb-2">
+                <label for="manifesto" class="form-label">Manifesto (optional)</label>
+                <textarea class="form-control" id="manifesto" name="manifesto" rows="3" placeholder="Why should students vote for you?"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit Nomination</button>
+        </form>
+    </div>
+</div>
+{% elif election.is_ongoing %}
+<div class="card mb-4">
+    <div class="card-header">Select a candidate and verify your identity to vote</div>
+    <div class="card-body">
+        {% if not current_user.has_face_registered() %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            You must <a href="{{ url_for('student.register_face_page') }}">register your face</a> before voting.
+        </div>
+        {% elif not candidates %}
+        <p class="text-muted mb-0">No candidates in this election yet.</p>
+        {% else %}
+        <form id="voteForm">
+            <input type="hidden" name="election_id" value="{{ election.id }}">
+            <div class="row g-3 mb-4">
+                {% for c in candidates %}
+                <div class="col-md-4">
+                    <div class="card h-100 candidate-card" data-candidate-id="{{ c.id }}" style="cursor:pointer;">
+                        <div class="card-body text-center">
+                            <i class="bi bi-person-badge display-4 text-primary"></i>
+                            <h5 class="mt-2">{{ c.user.name }}</h5>
+                            {% if c.manifesto %}
+                            <p class="small text-muted">{{ c.manifesto[:80] }}{% if c.manifesto|length > 80 %}...{% endif %}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="candidate_id" id="candidateId" required>
+            <div id="faceSection" class="d-none">
+                <h5 class="mb-2">Verify your identity</h5>
+                <p class="text-muted small">Position your face in the frame and click Vote.</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="border rounded overflow-hidden bg-dark mb-2" style="aspect-ratio:4/3;">
+                            <video id="video" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+                            <canvas id="canvas" class="d-none"></canvas>
+                        </div>
+                        <button type="button" id="submitVoteBtn" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Submit Vote
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="voteStatus" class="mt-2"></div>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% elif election.is_completed %}
+<div class="alert alert-secondary">
+    <i class="bi bi-clock-history me-2"></i>This election has ended. Results are available in the College dashboard.
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+{% if not already_voted and current_user.has_face_registered() and candidates %}
+<script>
+(function() {
+    const form = document.getElementById('voteForm');
+    const candidateCards = document.querySelectorAll('.candidate-card');
+    const candidateIdInput = document.getElementById('candidateId');
+    const faceSection = document.getElementById('faceSection');
+    const submitVoteBtn = document.getElementById('submitVoteBtn');
+    const voteStatus = document.getElementById('voteStatus');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let selectedCandidate = null;
+    let stream = null;
+
+    candidateCards.forEach(card => {
+        card.addEventListener('click', () => {
+            candidateCards.forEach(c => c.classList.remove('border-primary', 'border-3'));
+            card.classList.add('border-primary', 'border-3');
+            selectedCandidate = parseInt(card.dataset.candidateId);
+            candidateIdInput.value = selectedCandidate;
+            faceSection.classList.remove('d-none');
+        });
+    });
+
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            video.srcObject = stream;
+        } catch (e) {
+            voteStatus.className = 'alert alert-danger';
+            voteStatus.textContent = 'Camera access denied.';
+        }
+    }
+
+    submitVoteBtn.addEventListener('click', async () => {
+        if (!selectedCandidate) {
+            voteStatus.className = 'alert alert-warning';
+            voteStatus.textContent = 'Please select a candidate first.';
+            return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const imageData = canvas.toDataURL('image/jpeg');
+        submitVoteBtn.disabled = true;
+        voteStatus.className = 'alert alert-info';
+        voteStatus.textContent = 'Verifying and submitting vote...';
+        try {
+            const formData = new FormData();
+            formData.append('election_id', form.querySelector('input[name="election_id"]').value);
+            formData.append('candidate_id', selectedCandidate);
+            formData.append('image', imageData);
+            const r = await fetch('{{ url_for("vote_api.cast_vote") }}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await r.json();
+            if (data.success) {
+                voteStatus.className = 'alert alert-success';
+                voteStatus.textContent = 'Vote cast successfully! Redirecting...';
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                voteStatus.className = 'alert alert-danger';
+                voteStatus.textContent = data.error || 'Vote failed.';
+                submitVoteBtn.disabled = false;
+            }
+        } catch (e) {
+            voteStatus.className = 'alert alert-danger';
+            voteStatus.textContent = 'Network error. Try again.';
+            submitVoteBtn.disabled = false;
+        }
+    });
+
+    startCamera();
+    window.addEventListener('beforeunload', () => stream && stream.getTracks().forEach(t => t.stop()));
+})();
+</script>
+{% endif %}
+{% endblock %}
