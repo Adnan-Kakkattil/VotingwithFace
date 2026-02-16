@@ -20,12 +20,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY . .
 
-# Create upload directories
-RUN mkdir -p uploads face_encodings
+# Create directories for db, uploads, face encodings
+RUN mkdir -p uploads face_encodings data
 
 # Expose port
 EXPOSE 5000
 
-# Run seed and start server
-CMD python -m scripts.seed_admin 2>/dev/null || true && \
-    python run.py
+# Run seed and start server (exec form for proper signal handling)
+CMD ["sh", "-c", "python -m scripts.seed_admin 2>/dev/null || true && python run.py"]

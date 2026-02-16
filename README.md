@@ -16,7 +16,15 @@ A secure, biometric-based web application for college student elections using Py
 - OpenCV, face_recognition, dlib
 - Bootstrap 5
 
-## Setup
+## Docker (recommended)
+
+```bash
+docker-compose up --build
+```
+
+Then open http://localhost:5000
+
+## Local Setup
 
 ### 1. Create virtual environment
 

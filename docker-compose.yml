@@ -8,12 +8,13 @@ services:
     environment:
       - FLASK_ENV=development
       - SECRET_KEY=change-this-in-production
+      - DATABASE_URL=sqlite:////app/data/voting_system.db
     volumes:
-      - voting_db:/app/instance
+      - voting_data:/app/data
       - voting_uploads:/app/uploads
       - voting_faces:/app/face_encodings
 
 volumes:
-  voting_db:
+  voting_data:
   voting_uploads:
   voting_faces:
