@@ -3,12 +3,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system deps for dlib/opencv (if building from source)
+# Install system deps for dlib/opencv
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     libopenblas-dev \
     libx11-dev \
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
