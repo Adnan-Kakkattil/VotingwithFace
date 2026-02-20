@@ -65,12 +65,18 @@
             <input type="hidden" name="candidate_id" id="candidateId" required>
             <div id="faceSection" class="d-none">
                 <h5 class="mb-2">Verify your identity</h5>
-                <p class="text-muted small">Position your face in the frame and click Vote.</p>
+                <p class="text-muted small">Upload a recent clear photo of your face and click Vote.</p>
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="border rounded overflow-hidden bg-dark mb-2" style="aspect-ratio:4/3;">
-                            <video id="video" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
-                            <canvas id="canvas" class="d-none"></canvas>
+                        <label for="voteImage" class="form-label">Verification image</label>
+                        <input
+                            type="file"
+                            id="voteImage"
+                            class="form-control mb-2"
+                            accept="image/*"
+                        >
+                        <div class="border rounded overflow-hidden bg-light mb-2 d-none" id="votePreviewContainer" style="aspect-ratio:4/3;">
+                            <img id="votePreviewImg" src="" alt="Selected verification image" style="width:100%;height:100%;object-fit:cover;">
                         </div>
                         <button type="button" id="submitVoteBtn" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i>Submit Vote
@@ -99,11 +105,10 @@
     const faceSection = document.getElementById('faceSection');
     const submitVoteBtn = document.getElementById('submitVoteBtn');
     const voteStatus = document.getElementById('voteStatus');
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const voteImageInput = document.getElementById('voteImage');
+    const votePreviewContainer = document.getElementById('votePreviewContainer');
+    const votePreviewImg = document.getElementById('votePreviewImg');
     let selectedCandidate = null;
-    let stream = null;
 
     candidateCards.forEach(card => {
         card.addEventListener('click', () => {
@@ -115,26 +120,18 @@
         });
     });
 
-    async function startCamera() {
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-            video.srcObject = stream;
-        } catch (e) {
-            voteStatus.className = 'alert alert-danger';
-            voteStatus.textContent = 'Camera access denied.';
-        }
-    }
-
     submitVoteBtn.addEventListener('click', async () => {
         if (!selectedCandidate) {
             voteStatus.className = 'alert alert-warning';
             voteStatus.textContent = 'Please select a candidate first.';
             return;
         }
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-        const imageData = canvas.toDataURL('image/jpeg');
+        const selectedFile = voteImageInput.files && voteImageInput.files[0];
+        if (!selectedFile) {
+            voteStatus.className = 'alert alert-warning';
+            voteStatus.textContent = 'Please upload an image for face verification.';
+            return;
+        }
         submitVoteBtn.disabled = true;
         voteStatus.className = 'alert alert-info';
         voteStatus.textContent = 'Verifying and submitting vote...';
@@ -142,7 +139,7 @@
             const formData = new FormData();
             formData.append('election_id', form.querySelector('input[name="election_id"]').value);
             formData.append('candidate_id', selectedCandidate);
-            formData.append('image', imageData);
+            formData.append('image', selectedFile);
             const r = await fetch('{{ url_for("vote_api.cast_vote") }}', {
                 method: 'POST',
                 body: formData,
@@ -175,8 +172,16 @@
         }
     });
 
-    startCamera();
-    window.addEventListener('beforeunload', () => stream && stream.getTracks().forEach(t => t.stop()));
+    voteImageInput.addEventListener('change', () => {
+        const selectedFile = voteImageInput.files && voteImageInput.files[0];
+        if (!selectedFile) {
+            votePreviewContainer.classList.add('d-none');
+            votePreviewImg.src = '';
+            return;
+        }
+        votePreviewImg.src = URL.createObjectURL(selectedFile);
+        votePreviewContainer.classList.remove('d-none');
+    });
 })();
 </script>
 {% endif %}
