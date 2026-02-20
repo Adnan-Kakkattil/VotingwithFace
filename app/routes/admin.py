@@ -87,7 +87,58 @@ def create_election():
 def election_detail(eid):
     election = Election.query.get_or_404(eid)
     candidates = election.candidates.all()
-    return render_template('admin/election_detail.html', election=election, candidates=candidates)
+    candidate_user_ids = [c.user_id for c in candidates]
+    students_query = User.query.filter_by(role='student')
+    if candidate_user_ids:
+        students_query = students_query.filter(~User.id.in_(candidate_user_ids))
+    available_students = students_query.order_by(User.name).all()
+    return render_template(
+        'admin/election_detail.html',
+        election=election,
+        candidates=candidates,
+        available_students=available_students
+    )
+
+
+@admin_bp.route('/elections/<int:eid>/candidates/add', methods=['POST'])
+@login_required
+@admin_required
+def add_candidate_to_election(eid):
+    election = Election.query.get_or_404(eid)
+    user_id = request.form.get('user_id', type=int)
+    manifesto = request.form.get('manifesto', '').strip() or None
+    status = request.form.get('status', 'approved').strip().lower()
+
+    if not user_id:
+        flash('Please select a student.', 'error')
+        return redirect(url_for('admin.election_detail', eid=eid))
+
+    if status not in ('approved', 'pending'):
+        status = 'approved'
+
+    student = User.query.filter_by(id=user_id, role='student').first()
+    if not student:
+        flash('Selected user is not a valid student.', 'error')
+        return redirect(url_for('admin.election_detail', eid=eid))
+
+    existing = Candidate.query.filter_by(election_id=eid, user_id=user_id).first()
+    if existing:
+        flash('This student is already a candidate in this election.', 'info')
+        return redirect(url_for('admin.election_detail', eid=eid))
+
+    candidate = Candidate(
+        election_id=eid,
+        user_id=user_id,
+        manifesto=manifesto,
+        status=status
+    )
+    if status == 'approved':
+        candidate.approved_at = datetime.utcnow()
+
+    db.session.add(candidate)
+    db.session.commit()
+    flash(f'{student.name} added as candidate.', 'success')
+    return redirect(url_for('admin.election_detail', eid=eid))
 
 
 @admin_bp.route('/elections/<int:eid>/toggle', methods=['POST'])
